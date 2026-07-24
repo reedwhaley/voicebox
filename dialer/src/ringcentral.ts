@@ -15,7 +15,6 @@ interface CallSessionLike extends EventEmitterLike {
   partyId?: string;
   streamAudio(audio: Buffer): AudioStreamerLike;
   hangup(): void;
-  cancel(): void;
 }
 
 export class RingCentralPhone {
@@ -43,7 +42,7 @@ export class RingCentralPhone {
   public async callAndPlay(params: {
     destination: string;
     pcm: Buffer;
-    answerTimeoutMs: number;
+    mediaStartDelayMs: number;
     hangupAfterPlayback: boolean;
   }): Promise<void> {
     const session = (await this.softphone.call(params.destination)) as unknown as CallSessionLike;
@@ -54,11 +53,10 @@ export class RingCentralPhone {
       destination: params.destination,
     });
 
-    const answered = await waitForAnswer(session, params.answerTimeoutMs);
-    if (!answered) {
-      session.cancel();
-      throw new Error(`Call was not answered within ${params.answerTimeoutMs}ms`);
-    }
+    // RingCentral's outbound SIP flow emits `answered` immediately, before the
+    // remote party necessarily answers. This delay is only for the first media
+    // proof. Reliable answer detection will come from Call Control events.
+    await delay(params.mediaStartDelayMs);
 
     const streamer = session.streamAudio(params.pcm);
     await waitForEvent(streamer, "finished");
@@ -71,28 +69,8 @@ export class RingCentralPhone {
   }
 }
 
-async function waitForAnswer(session: CallSessionLike, timeoutMs: number): Promise<boolean> {
-  return new Promise<boolean>((resolve, reject) => {
-    let settled = false;
-    const finish = (value: boolean): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-
-    session.once("answered", () => finish(true));
-    session.once("busy", () => finish(false));
-    session.once("disposed", () => finish(false));
-    session.once("failed", (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(error instanceof Error ? error : new Error("RingCentral call failed"));
-    });
-
-    const timer = setTimeout(() => finish(false), timeoutMs);
-  });
+async function delay(milliseconds: number): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function waitForEvent(emitter: EventEmitterLike, event: string, timeoutMs = 120_000): Promise<void> {
