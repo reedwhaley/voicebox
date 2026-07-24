@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   await phone.callAndPlay({
     destination: config.dialToNumber,
     pcm,
-    answerTimeoutMs: config.answerTimeoutMs,
+    mediaStartDelayMs: config.mediaStartDelayMs,
     hangupAfterPlayback: config.hangupAfterGreeting,
   });
 
