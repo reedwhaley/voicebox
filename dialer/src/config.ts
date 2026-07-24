@@ -11,7 +11,7 @@ export interface DialerConfig {
     authorizationId: string;
   };
   ringCentralDebug: boolean;
-  answerTimeoutMs: number;
+  mediaStartDelayMs: number;
   hangupAfterGreeting: boolean;
 }
 
@@ -31,12 +31,12 @@ function booleanValue(name: string, fallback: boolean): boolean {
   throw new Error(`${name} must be true or false`);
 }
 
-function positiveInteger(name: string, fallback: number): number {
+function nonNegativeInteger(name: string, fallback: number): number {
   const value = process.env[name]?.trim();
   if (!value) return fallback;
   const parsed = Number.parseInt(value, 10);
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer`);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative integer`);
   }
   return parsed;
 }
@@ -55,7 +55,7 @@ export function loadConfig(): DialerConfig {
       authorizationId: required("SIP_AUTHORIZATION_ID"),
     },
     ringCentralDebug: booleanValue("RINGCENTRAL_DEBUG", false),
-    answerTimeoutMs: positiveInteger("CALL_ANSWER_TIMEOUT_MS", 45_000),
+    mediaStartDelayMs: nonNegativeInteger("CALL_MEDIA_START_DELAY_MS", 5_000),
     hangupAfterGreeting: booleanValue("CALL_HANGUP_AFTER_GREETING", true),
   };
 }
